@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Random App Name64611</title>
+
+    <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function () {
+                Ext.define('CustomApp', {
+  extend: 'Rally.app.App',
+  componentCls: 'app',
+  launch: function() {
+    debugger;
+
+    var app = this;
+    var snapshotfilters = [];
+    // var project = this.getContext().getProject();
+    // var poid = project.ObjectID;
+    // or poid = this.getContext().getProject().ObjectID in one call
+    // var datacontext = this.getContext().getDataContext();
+    // debugger;
+
+    // _TypeHierarchy scope to artifact type
+    snapshotfilters.push({
+        property: '_TypeHierarchy',
+        operator: '=',
+        value: 'PortfolioItem/Feature'
+    });
+
+    // FormattedID just get a single story, for debugging
+    // snapshotfilters.push({
+    //     property: 'FormattedID',
+    //     operator: '=',
+    //     value: 'US64950'
+    // });
+
+    // _PreviousValues include only snapshots where PlanEstimate changed & previous value > 0 (elminates original est value)
+    // snapshotfilters.push({
+    //     property: '_PreviousValues.PlanEstimate',
+    //     value: {$exists: true}
+    // });
+    // snapshotfilters.push({
+    //     property: '_PreviousValues.PlanEstimate',
+    //     operator: '>',
+    //     value: 0
+    // });
+    snapshotfilters.push({
+        property: '_PreviousValues.LeafStoryPlanEstimateTotal',
+        value: {$exists: true}
+    });
+    snapshotfilters.push({
+        property: '_PreviousValues.LeafStoryPlanEstimateTotal',
+        value: {$ne: null}
+    });
+
+    // _ValidFrom set to limit timeboxscope, >= sprint start and <= sprint end
+    snapshotfilters.push({
+      property: '_ValidFrom',
+      operator: '>=',
+      value: '2018-03-01TZ'
+    });
+    snapshotfilters.push({
+      property: '_ValidFrom',
+      operator: '<=',
+      value: '2018-03-14TZ'
+    });
+
+    // _ValidTo if specifed will not include current snapshot, see __At and 'current'
+    // current snapshot date is 9999-99-99TZ
+    // snapshotfilters.push({
+    //     property: '_ValidTo',
+    //     operator: '<=',
+    //     value: '2016-10-31TZ'
+    // });
+
+    // _ProjectHierarchy !! required to limit scope !!
+    snapshotfilters.push({
+        property: '_ProjectHierarchy',
+        operator: '=',
+        value: this.getContext().getProject().ObjectID
+    });
+
+    //create the store
+    var snapshotStore = Ext.create('Rally.data.lookback.SnapshotStore', {
+        compress: true,
+        context: this.getContext().getDataContext(),
+        fetch: ['FormattedID',
+          'Name',
+          'LeafStoryPlanEstimateTotal',
+          'LeafStoryCount',
+          '_PreviousValues.LeafStoryPlanEstimateTotal',
+          '_PreviousValues.LeafStoryCount'],
+        hydrate: ['_PreviousValues.LeafStoryPlanEstimateTotal',
+          '_PreviousValues.LeafStoryCount' ],
+        filters: snapshotfilters,
+        groupField: 'Name',
+        groupDir: 'ASC',
+        getGroupString: function(instance){
+          return instance.get('FormattedID') + ' ' + instance.get('Name');
+        },
+        removeUnauthorizedSnapshots: true
+    });
+
+    //load the store
+    snapshotStore.load({
+      callback: function(records, operation) {
+        debugger;
+        if (operation.wasSuccessful()) {
+          //process records
+          debugger;
+          console.log(records);
+          app.add({
+            xtype: 'rallygrid',
+            store: snapshotStore,
+            showRowActionsColumn: false,
+            //features: ['grouping', 'groupingsummary'],
+            features: [{
+              ftype: 'groupingsummary',
+              groupHeaderTpl: '{FormattedID} {name} ({rows.length})'
+            }],
+            columnCfgs: [
+              {
+                // xtype: 'templatecolumn',
+                text: 'ID',
+                dataIndex: 'FormattedID',
+                width: 100,
+                // tpl: Ext.create('Rally.ui.renderer.template.FormattedIDTemplate')
+                renderer: function(value) {
+                  //debugger;
+                  return value;
+                }
+              }, {
+                text: 'Name',
+                dataIndex: 'Name'
+              // }, {
+              //     text: 'Plan Estimate',
+              //     dataIndex: 'PlanEstimate'
+              // }, {
+              //     text: 'Previous PlanEstimate',
+              //     dataIndex: '_PreviousValues',
+              //     renderer: function(value){
+              //       return value.PlanEstimate;
+              // }
+            }, {
+              text: 'Date',
+              dataIndex: '_ValidFrom'
+            }, {
+                  text: 'Plan Est Total',
+                  dataIndex: 'LeafStoryPlanEstimateTotal',
+                  renderer: function(value) {
+                    //debugger;
+                    return value;
+                  }
+              }, {
+                text: 'Previous total',
+                dataIndex: '_PreviousValues.LeafStoryPlanEstimateTotal',
+                renderer: function(value) {
+                  debugger;
+                  return value;
+                }
+              }, {
+                    text: 'LeafStoryCount',
+                    dataIndex: 'LeafStoryCount',
+                    renderer: function(value) {
+                      //debugger;
+                      return value;
+                    }
+                }, {
+                  text: 'Previous count',
+                  dataIndex: '_PreviousValues.LeafStoryCount',
+                  renderer: function(value) {
+                    debugger;
+                    return value;
+                  }
+                }
+            ]
+          });
+        }
+      }
+    });
+  }
+});
+
+
+            Rally.launchApp('CustomApp', {
+                name:"Random App Name64611",
+	            parentRepos:""
+            });
+
+        });
+    </script>
+
+
+
+    <style type="text/css">
+        .app {
+  /* Add app styles here */
+}
+
+    </style>
+</head>
+<body>
+</body>
+</html>

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Random App Name64611</title>
+
+    <script type="text/javascript" src="https://rally1.rallydev.com/apps/2.1/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function () {
+                Ext.define("CustomApp",{extend:"Rally.app.App",componentCls:"app",launch:function(){var app=this,snapshotfilters=[];snapshotfilters.push({property:"_TypeHierarchy",operator:"=",value:"PortfolioItem/Feature"}),snapshotfilters.push({property:"_PreviousValues.LeafStoryPlanEstimateTotal",value:{$exists:!0}}),snapshotfilters.push({property:"_PreviousValues.LeafStoryPlanEstimateTotal",value:{$ne:null}}),snapshotfilters.push({property:"_ValidFrom",operator:">=",value:"2018-03-01TZ"}),snapshotfilters.push({property:"_ValidFrom",operator:"<=",value:"2018-03-14TZ"}),snapshotfilters.push({property:"_ProjectHierarchy",operator:"=",value:this.getContext().getProject().ObjectID});var snapshotStore=Ext.create("Rally.data.lookback.SnapshotStore",{compress:!0,context:this.getContext().getDataContext(),fetch:["FormattedID","Name","LeafStoryPlanEstimateTotal","LeafStoryCount","_PreviousValues.LeafStoryPlanEstimateTotal","_PreviousValues.LeafStoryCount"],hydrate:["_PreviousValues.LeafStoryPlanEstimateTotal","_PreviousValues.LeafStoryCount"],filters:snapshotfilters,groupField:"Name",groupDir:"ASC",getGroupString:function(instance){return instance.get("FormattedID")+" "+instance.get("Name")},removeUnauthorizedSnapshots:!0});snapshotStore.load({callback:function(records,operation){operation.wasSuccessful()&&(console.log(records),app.add({xtype:"rallygrid",store:snapshotStore,showRowActionsColumn:!1,features:[{ftype:"groupingsummary",groupHeaderTpl:"{FormattedID} {name} ({rows.length})"}],columnCfgs:[{text:"ID",dataIndex:"FormattedID",width:100,renderer:function(value){return value}},{text:"Name",dataIndex:"Name"},{text:"Date",dataIndex:"_ValidFrom"},{text:"Plan Est Total",dataIndex:"LeafStoryPlanEstimateTotal",renderer:function(value){return value}},{text:"Previous total",dataIndex:"_PreviousValues.LeafStoryPlanEstimateTotal",renderer:function(value){return value}},{text:"LeafStoryCount",dataIndex:"LeafStoryCount",renderer:function(value){return value}},{text:"Previous count",dataIndex:"_PreviousValues.LeafStoryCount",renderer:function(value){return value}}]}))}})}});
+
+            Rally.launchApp('CustomApp', {
+                name:"Random App Name64611",
+	            parentRepos:""
+            });
+
+        });
+    </script>
+
+
+    <style type="text/css">
+        
+    </style>
+</head>
+<body>
+</body>
+</html>
