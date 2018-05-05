@@ -20,79 +20,15 @@ Ext.define('CustomApp', {
      autoload: false,
     });
     timeboxstore.load().then({
-      success: function(data) {
-        var oids = [];
-        _.each(data, function(timeboxrec){
-          oids.push(timeboxrec.get('ObjectID'));
-        });
-        //debugger;
-        var snapshotfilters = [];
-        var timeboxScope = this.getContext().getTimeboxScope();
-        var timeboxRec = timeboxScope.getRecord();
-
-        snapshotfilters.push({
-          property: '_ProjectHierarchy',
-          value: this.getContext().getProject().ObjectID
-        });
-        snapshotfilters.push({
-          property: '_TypeHierarchy',
-          value: 'PortfolioItem/Feature'
-        });
-        snapshotfilters.push({
-          property: 'Release',
-          operator: '$in',
-          value: oids
-        });
-        snapshotfilters.push({
-          id: '__At',
-          property: '__At',
-          value: timeboxRec.get('formattedStartDate')
-        });
-        var snapshot1Store = Ext.create('Rally.data.lookback.SnapshotStore', {
-          compress: true,
-          context: this.getContext().getDataContext(),
-          fetch: ['FormattedID',
-            'Name',
-            'Release',
-            'Project',
-            'LeafStoryCount',
-            'LeafStoryPlanEstimateTotal'
-          ],
-          hydrate: ['Project'],
-          sorters: [
-          {
-            property: 'FormattedID',
-            direction: 'ASC'
-          }],
-          filters: snapshotfilters,
-          removeUnauthorizedSnapshots: true
-        });
-        var snapshot2Store = Ext.create('Rally.data.lookback.SnapshotStore', {
-          compress: true,
-          context: this.getContext().getDataContext(),
-          fetch: ['FormattedID',
-            'Name',
-            'Release',
-            'Project',
-            'LeafStoryCount',
-            'LeafStoryPlanEstimateTotal'
-          ],
-          hydrate: ['Project'],
-          sorters: [
-          {
-            property: 'FormattedID',
-            direction: 'ASC'
-          }],
-          filters: snapshotfilters,
-          removeUnauthorizedSnapshots: true
-        });
-        snapshot2Store.removeFilter('__At', false);
-        snapshot2Store.addFilter({
-          id: '__At',
-          property: '__At',
-          value: 'current'
-        },false);
-
+      success: function(releases) {
+        var snapshot1Store = this._createsRelSnapshotSstoreAtDate(
+          this._getReleaseScopeOIDs(releases),
+          this.getContext().getTimeboxScope().getRecord().get('formattedStartDate')
+        );
+        var snapshot2Store = this._createsRelSnapshotSstoreAtDate(
+          this._getReleaseScopeOIDs(releases),
+          'current'
+        );
         Deft.Promise.all([snapshot1Store.load(),snapshot2Store.load()]).then({
           success: function(results){
             //debugger;
@@ -149,9 +85,9 @@ Ext.define('CustomApp', {
                     foundrec.LeafStoryCount2 = snapshot2rec.get('LeafStoryCount');
                     foundrec.LeafStoryPlanEstimateTotal2 = snapshot2rec.get('LeafStoryPlanEstimateTotal');
                     foundrec.LeafStoryCountChg = foundrec.LeafStoryCount2 - foundrec.LeafStoryCount1;
-                    foundrec.LeafStoryCountPercentChg = (foundrec.LeafStoryCountChg /foundrec.LeafStoryCount1).toFixed(2) * 100;
+                    foundrec.LeafStoryCountPercentChg = ((foundrec.LeafStoryCountChg /foundrec.LeafStoryCount1) * 100).toFixed(1) + ' %';
                     foundrec.LeafStoryPlanEstimateTotalChg = foundrec.LeafStoryPlanEstimateTotal2 - foundrec.LeafStoryPlanEstimateTotal1;
-                    foundrec.LeafStoryPlanEstimateTotalPercentChg = ((foundrec.LeafStoryPlanEstimateTotalChg / foundrec.LeafStoryPlanEstimateTotal1)* 100).toFixed(2);
+                    foundrec.LeafStoryPlanEstimateTotalPercentChg = ((foundrec.LeafStoryPlanEstimateTotalChg / foundrec.LeafStoryPlanEstimateTotal1)* 100).toFixed(1)  + ' %';
                 }
               });
               gridrecords.forEach(function(grid_rec){
@@ -185,7 +121,8 @@ Ext.define('CustomApp', {
                   dataIndex: 'FormattedID'
                 },{
                   text: 'Name',
-                  dataIndex: 'Name'
+                  dataIndex: 'Name',
+                  width: 200
                 },{
                   text: 'Project',
                   dataIndex: 'Project'
@@ -232,20 +169,50 @@ Ext.define('CustomApp', {
      scope: this
     });
   },
-  _buildgridrecords: function(records) {
-    return gridrecords;
+  _getReleaseScopeOIDs: function (releases) {
+    var oids = [];
+    _.each(releases, function(release){
+      oids.push(release.get('ObjectID'));
+    });
+    return oids;
   },
-  _createsnapshot1store:function(){
-
+  _createsRelSnapshotSstoreAtDate:function(relScopeOIDs, atDate){
+    var snapshotfilters = [];
+    snapshotfilters.push({
+      property: '_ProjectHierarchy',
+      value: this.getContext().getProject().ObjectID
+    });
+    snapshotfilters.push({
+      property: '_TypeHierarchy',
+      value: 'PortfolioItem/Feature'
+    });
+    snapshotfilters.push({
+      property: 'Release',
+      operator: '$in',
+      value: relScopeOIDs
+    });
+    snapshotfilters.push({
+      id: '__At',
+      property: '__At',
+      value: atDate
+    });
+    return Ext.create('Rally.data.lookback.SnapshotStore', {
+      compress: true,
+      context: this.getContext().getDataContext(),
+      fetch: ['FormattedID',
+        'Name',
+        'Release',
+        'Project',
+        'LeafStoryCount',
+        'LeafStoryPlanEstimateTotal'
+      ],
+      hydrate: ['Project'],
+      sorters: [{
+        property: 'FormattedID',
+        direction: 'ASC'
+      }],
+      filters: snapshotfilters,
+      removeUnauthorizedSnapshots: true
+    });
   },
-  _createsnapshot2store:function(){
-
-  },
-  _loadsnapshot1: function() {
-
-  },
-  _loadsnapshot2: function () {
-
-  }
-
 });
