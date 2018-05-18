@@ -67,15 +67,27 @@ Ext.define('CustomApp', {
     var atDates = [];
     //use start of pi date for first snapshot
     atDates.push(release.get('formattedStartDate'));
+    //loop adding two weeks to start date until > now or PI end date
+    var dstart = new Date(release.get('formattedStartDate'));
+    var dend = new Date(release.get('formattedEndDate'));
+    var dnow = new Date();
+    var dnext = Rally.util.DateTime.add(dstart, "day", 14);
+    while(
+      (Rally.util.DateTime.getDifference(dend, dnext,'day') > 0) &&
+      (Rally.util.DateTime.getDifference(dnow, dnext,'day') > 0)
+    ) {
+      atDates.push(Rally.util.DateTime.format(dnext, "Y-m-d"));
+      dnext = Rally.util.DateTime.add(dnext, "day", 14);
+    }
 
-    var dtend = new Date(release.get('formattedEndDate'));
-    var dtnow = new Date();
-    if (Rally.util.DateTime.getDifference(dtnow, dtend,'day') > 0) {
+    //last snapshot date either end of PI or current date
+    if (Rally.util.DateTime.getDifference(dnow, dend,'day') > 0) {
       //now > rel end date, past the pi end Date
-      //use pi end date for second snapshotfilters
+      //use pi end date for snapshot
       atDates.push(release.get('formattedEndDate'));
     } else {
-      //use current Date for second snapshot
+      //PI end date in the future
+      //use current Date for snapshot
       atDates.push('current');
     }
     return atDates;
@@ -120,95 +132,64 @@ Ext.define('CustomApp', {
     });
   },
   _buildDisplayGridRecords: function(snapshots) {
-    snapshot1records = snapshots[0];
-    snapshot2records = snapshots[1];
+    //snapshots is an array of arrays of snapshot results, one per snapshot date
+    //debugger;
+    var snapshotdates = this._getSnapshotdates(this.getContext().getTimeboxScope().getRecord());
     var gridrecords = [];
-    //iterate over  snapshot1 records
-    //create a custom grid record for each
-    _.each(snapshot1records, function(snapshot1rec){
-      grid_rec = new Object();
-      grid_rec.FormattedID = snapshot1rec.get('FormattedID');
-      grid_rec.Name = snapshot1rec.get('Name');
-      grid_rec.Project = snapshot1rec.get('Project').Name;
-      grid_rec.LeafStoryCount1 = snapshot1rec.get('LeafStoryCount');
-      grid_rec.LeafStoryCount2 = null;
-      grid_rec.LeafStoryPlanEstimateTotal1 = snapshot1rec.get('LeafStoryPlanEstimateTotal');
-      grid_rec.LeafStoryPlanEstimateTotal2 = null;
-      grid_rec.LeafStoryCountChg = null;
-      grid_rec.LeafStoryCountPercentChg = null;
-      grid_rec.LeafStoryPlanEstimateTotalChg = null;
-      grid_rec.LeafStoryPlanEstimateTotalPercentChg = null;
-      grid_rec.Comment = '';
-      gridrecords.push(grid_rec);
-    });
-    console.log(gridrecords);
-    //iterate over snapshot2 records, matching and updating
-    //ones that exist from snapshot1, adding new ones only in
-    //snapshot2
-    _.each(snapshot2records, function(snapshot2rec){
-      //find  by FeatureID
-      var foundrec = gridrecords.find(function (gridrec) {
-        return (gridrec.FormattedID === snapshot2rec.get('FormattedID'));
-      });
-      if (foundrec === undefined){
-        //not in first snapshot rec set
-        //add it
-        grid_rec = new Object();
-        grid_rec.FormattedID = snapshot2rec.get('FormattedID');
-        grid_rec.Name = snapshot2rec.get('Name');
-        grid_rec.Project = snapshot2rec.get('Project').Name;
-        grid_rec.LeafStoryCount1 = null;
-        grid_rec.LeafStoryPlanEstimateTotal1 = null;
-        grid_rec.LeafStoryCount2 = snapshot2rec.get('LeafStoryCount');
-        grid_rec.LeafStoryPlanEstimateTotal2 = snapshot2rec.get('LeafStoryPlanEstimateTotal');
-        grid_rec.LeafStoryCountChg = grid_rec.LeafStoryCount2;
-        grid_rec.LeafStoryCountPercentChg = 'n/a';
-        grid_rec.LeafStoryPlanEstimateTotalChg = grid_rec.LeafStoryPlanEstimateTotal2;
-        grid_rec.LeafStoryPlanEstimateTotalPercentChg = 'n/a';
-        grid_rec.Comment = 'added after start of PI';
-        gridrecords.push(grid_rec);
-      } else {
-        //populate the snapshot2 values
-          foundrec.LeafStoryCount2 = snapshot2rec.get('LeafStoryCount');
-          foundrec.LeafStoryPlanEstimateTotal2 = snapshot2rec.get('LeafStoryPlanEstimateTotal');
-          foundrec.LeafStoryCountChg = foundrec.LeafStoryCount2 - foundrec.LeafStoryCount1;
-          foundrec.LeafStoryCountPercentChg = ((foundrec.LeafStoryCountChg /foundrec.LeafStoryCount1) * 100).toFixed(1) + ' %';
-          foundrec.LeafStoryPlanEstimateTotalChg = foundrec.LeafStoryPlanEstimateTotal2 - foundrec.LeafStoryPlanEstimateTotal1;
-          foundrec.LeafStoryPlanEstimateTotalPercentChg = ((foundrec.LeafStoryPlanEstimateTotalChg / foundrec.LeafStoryPlanEstimateTotal1)* 100).toFixed(1)  + ' %';
+
+    //constructor
+    // function Gridrecord(snapshotdates){
+    //   this.FormattedID = asnapshotrecord.get('FormattedID');
+    //   this.Name = asnapshotrecord.get('Name');
+    //   this.Project = asnapshotrecord.get('Project').Name;
+    //   for (var i = 0; i < snapshotdates.length; i++ ) {
+    //     this.[snapshotdates[i]] = null;
+    //   }
+    // };
+
+    for (var i = 0; i < snapshots.length; i++ ) {
+      //debugger;
+      console.log(i);
+      console.log(snapshots[i]);
+      for (var n = 0; n < snapshots[i].length; n++){
+        //find  by FeatureID
+        var snapshotrec = snapshots[i][n];
+        var foundrec = gridrecords.find(function (element) {
+          return (element.FormattedID === snapshotrec.get('FormattedID'));
+        });
+        if (foundrec === undefined){
+          //add it
+          var grid_rec = new Object();
+          grid_rec.FormattedID = snapshotrec.get('FormattedID');
+          grid_rec.Name = snapshotrec.get('Name');
+          grid_rec.Project = snapshotrec.get('Project').Name;
+          for (var j = 0; j < snapshotdates.length; j++){
+            grid_rec[snapshotdates[j]] = null;
+          }
+          //snapshot store filter item 3 is '__At' date
+          grid_rec[snapshotrec.store.getFilters().items[3].value] = snapshotrec.get('LeafStoryPlanEstimateTotal');
+          grid_rec.firstVal =  snapshotrec.get('LeafStoryPlanEstimateTotal');
+          if (i !== 0) { //not the first snapshotdate
+            grid_rec.Note = "Added after PI start";
+          }
+          gridrecords.push(grid_rec);
+        } else {
+          //populate the snapshot2 values
+          foundrec[snapshotrec.store.getFilters().items[3].value] = snapshotrec.get('LeafStoryPlanEstimateTotal');
+          foundrec.changeVal = snapshotrec.get('LeafStoryPlanEstimateTotal') - foundrec.firstVal;
+        }
       }
-    });
-    gridrecords.forEach(function(grid_rec){
-      if(grid_rec.LeafStoryCount2 == null && grid_rec.LeafStoryPlanEstimateTotal2 == null) {
-        grid_rec.Comment = 'removed after start of PI';
-      }
-      if(grid_rec.LeafStoryCount1 == null ) {
-        //divide by zero undefined
-        grid_rec.LeafStoryCountPercentChg = null;
-      }
-      if(grid_rec.LeafStoryPlanEstimateTotal1 == null) {
-        //divide by zero undefined
-        grid_rec.LeafStoryPlanEstimateTotalPercentChg = null;
-      }
-    });
+    }
     return gridrecords;
   },
   _displayxgrid: function(gridrecords) {
+    //debugger;
     if (this._myGrid) {
         this._myGrid.destroy();
     }
-    this._myGrid = Ext.create('Rally.ui.grid.Grid', {
-      xtype: 'rallygrid',
-      showRowActionsColumn: false,
-      store: Ext.create('Rally.data.custom.Store', {
-        data: gridrecords,
-        sorters: [{
-          property: 'LeafStoryPlanEstimateTotalChg',
-          direction: 'DESC'
-        }]
-      }),
-      columnCfgs: [{
-        text: 'ID',
-        dataIndex: 'FormattedID'
+    var columns = [{
+      text: 'ID',
+      dataIndex: 'FormattedID'
       },{
         text: 'Name',
         dataIndex: 'Name',
@@ -216,34 +197,74 @@ Ext.define('CustomApp', {
       },{
         text: 'Project',
         dataIndex: 'Project'
-      },{
-        text: 'Story Count',
-        dataIndex: 'LeafStoryCount1'
-      },{
-        text: 'Story Plan Est Total',
-        dataIndex: 'LeafStoryPlanEstimateTotal1'
-      },{
-        text: 'Story Count 2',
-        dataIndex: 'LeafStoryCount2'
-      },{
-        text: 'Story Plan Est Total 2',
-        dataIndex: 'LeafStoryPlanEstimateTotal2'
-      },{
-        text: 'Story count chg',
-        dataIndex: 'LeafStoryCountChg'
-      },{
-        text: 'Story Plan Est Chg',
-        dataIndex: 'LeafStoryPlanEstimateTotalChg'
-      },{
-        text: 'Story Count % Chg',
-        dataIndex: 'LeafStoryCountPercentChg',
-      },{
-        text: 'Story Plan Est % Chg',
-        dataIndex: 'LeafStoryPlanEstimateTotalPercentChg'
-      },{
-        text: 'Comment',
-        dataIndex: 'Comment'
-      }]
+      }
+    ];
+    var snapshotdates = this._getSnapshotdates(this.getContext().getTimeboxScope().getRecord());
+    for (var i = 0; i < snapshotdates.length; i++){
+      columns.push({
+        text: snapshotdates[i],
+        dataIndex: snapshotdates[i]
+      });
+    }
+    columns.push({
+      text: 'change',
+      dataIndex: 'changeVal'
+    });
+    columns.push({
+      text: 'Note',
+      dataIndex: 'Note'
+    });
+
+    this._myGrid = Ext.create('Rally.ui.grid.Grid', {
+      xtype: 'rallygrid',
+      showRowActionsColumn: false,
+      store: Ext.create('Rally.data.custom.Store', {
+        data: gridrecords,
+        sorters: [{
+          property: 'changeVal',
+          direction: 'DESC'
+        }]
+      }),
+      columnCfgs: columns
+      //autoAddAllModelFieldsAsColumns: true
+      // columnCfgs: [{
+      //   text: 'ID',
+      //   dataIndex: 'FormattedID'
+      // },{
+      //   text: 'Name',
+      //   dataIndex: 'Name',
+      //   width: 200
+      // },{
+      //   text: 'Project',
+      //   dataIndex: 'Project'
+      // },{
+      //   text: 'Story Count',
+      //   dataIndex: 'LeafStoryCount1'
+      // },{
+      //   text: 'Story Plan Est Total',
+      //   dataIndex: 'LeafStoryPlanEstimateTotal1'
+      // },{
+      //   text: 'Story Count 2',
+      //   dataIndex: 'LeafStoryCount2'
+      // },{
+      //   text: 'Story Plan Est Total 2',
+      //   dataIndex: 'LeafStoryPlanEstimateTotal2'
+      // },{
+      //   text: 'Story count chg',
+      //   dataIndex: 'LeafStoryCountChg'
+      // },{
+      //   text: 'Story Plan Est Chg',
+      //   dataIndex: 'LeafStoryPlanEstimateTotalChg'
+      // },{
+      //   text: 'Story Count % Chg',
+      //   dataIndex: 'LeafStoryCountPercentChg',
+      // },{
+      //   text: 'Story Plan Est % Chg',
+      //   dataIndex: 'LeafStoryPlanEstimateTotalPercentChg'
+      // },{
+      //   text: 'Comment',
+      //   dataIndex: 'Comment'
+      // }]
     });
     this.add(this._myGrid);
   }
