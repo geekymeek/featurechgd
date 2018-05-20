@@ -38,9 +38,9 @@ Ext.define('CustomApp', {
         Deft.Promise.all(loadfunctions).then({
           success: function(results){
             //debugger;
-            console.log(results);
+            //console.log(results);
             var gridrecords = this._buildDisplayGridRecords(results);
-            console.log(gridrecords);
+            //console.log(gridrecords);
             this._displayxgrid(gridrecords);
           },
           failure: function(){
@@ -132,25 +132,21 @@ Ext.define('CustomApp', {
     });
   },
   _buildDisplayGridRecords: function(snapshots) {
+    console.log(snapshots);
     //snapshots is an array of arrays of snapshot results, one per snapshot date
     //debugger;
     var snapshotdates = this._getSnapshotdates(this.getContext().getTimeboxScope().getRecord());
+    
+    // var summarygridrecords = [{label:'added'},{label:'removed'},{label:'changed'},{label:'unchanged'}];
+    // snapshotdates.forEach(function(element){
+    //   summarygridrecord.added
+    // });
+
     var gridrecords = [];
-
-    //constructor
-    // function Gridrecord(snapshotdates){
-    //   this.FormattedID = asnapshotrecord.get('FormattedID');
-    //   this.Name = asnapshotrecord.get('Name');
-    //   this.Project = asnapshotrecord.get('Project').Name;
-    //   for (var i = 0; i < snapshotdates.length; i++ ) {
-    //     this.[snapshotdates[i]] = null;
-    //   }
-    // };
-
     for (var i = 0; i < snapshots.length; i++ ) {
       //debugger;
-      console.log(i);
-      console.log(snapshots[i]);
+      //console.log(i);
+      //console.log(snapshots[i]);
       for (var n = 0; n < snapshots[i].length; n++){
         //find  by FeatureID
         var snapshotrec = snapshots[i][n];
@@ -159,31 +155,48 @@ Ext.define('CustomApp', {
         });
         if (foundrec === undefined){
           //add it
-          var grid_rec = new Object();
-          grid_rec.FormattedID = snapshotrec.get('FormattedID');
-          grid_rec.Name = snapshotrec.get('Name');
-          grid_rec.Project = snapshotrec.get('Project').Name;
+          var newgridrec = {};
+          newgridrec.FormattedID = snapshotrec.get('FormattedID');
+          newgridrec.Name = snapshotrec.get('Name');
+          newgridrec.Project = snapshotrec.get('Project').Name;
           for (var j = 0; j < snapshotdates.length; j++){
-            grid_rec[snapshotdates[j]] = null;
+            newgridrec[snapshotdates[j]] = null;
           }
           //snapshot store filter item 3 is '__At' date
-          grid_rec[snapshotrec.store.getFilters().items[3].value] = snapshotrec.get('LeafStoryPlanEstimateTotal');
-          grid_rec.firstVal =  snapshotrec.get('LeafStoryPlanEstimateTotal');
-          if (i !== 0) { //not the first snapshotdate
-            grid_rec.Note = "Added after PI start";
-          }
-          gridrecords.push(grid_rec);
+          newgridrec[snapshotrec.store.getFilters().items[3].value] = snapshotrec.get('LeafStoryPlanEstimateTotal');
+          newgridrec.firstVal =  snapshotrec.get('LeafStoryPlanEstimateTotal');
+          newgridrec.changeVal = 0;
+          gridrecords.push(newgridrec);
         } else {
-          //populate the snapshot2 values
           foundrec[snapshotrec.store.getFilters().items[3].value] = snapshotrec.get('LeafStoryPlanEstimateTotal');
           foundrec.changeVal = snapshotrec.get('LeafStoryPlanEstimateTotal') - foundrec.firstVal;
         }
       }
     }
+
+    // set the display grid comment
+    //added: added to release after start of PI
+    //removed: removed from release after start of PI
+    //changed: in PI at start and end, but plan est total changed
+    //unchanged: in PI at start and end, plan est total unchanged
+    for (i = 0; i < gridrecords.length; i++ ) {
+      var gridrec = gridrecords[i];
+      if (gridrec[snapshotdates[0]] === null) {
+        gridrec.Note = 'added';
+      } else if (gridrec[snapshotdates[snapshotdates.length-1]] === null) {
+        gridrec.Note = 'removed';
+      } else if (gridrec.changeVal !== 0) {
+        gridrec.Note = 'changed';
+      } else {
+        gridrec.Note = 'unchanged';
+      }
+    }
+
+    console.log(gridrecords);
     return gridrecords;
   },
   _displayxgrid: function(gridrecords) {
-    //debugger;
+    debugger;
     if (this._myGrid) {
         this._myGrid.destroy();
     }
@@ -193,22 +206,25 @@ Ext.define('CustomApp', {
       },{
         text: 'Name',
         dataIndex: 'Name',
-        width: 200
+        width: 400
       },{
         text: 'Project',
-        dataIndex: 'Project'
+        dataIndex: 'Project',
+        width: 150
       }
     ];
     var snapshotdates = this._getSnapshotdates(this.getContext().getTimeboxScope().getRecord());
     for (var i = 0; i < snapshotdates.length; i++){
       columns.push({
         text: snapshotdates[i],
-        dataIndex: snapshotdates[i]
+        dataIndex: snapshotdates[i],
+        summaryType: 'sum'
       });
     }
     columns.push({
-      text: 'change',
-      dataIndex: 'changeVal'
+      text: 'Plan Est Total Chg',
+      dataIndex: 'changeVal',
+      summaryType: 'sum'
     });
     columns.push({
       text: 'Note',
@@ -225,46 +241,11 @@ Ext.define('CustomApp', {
           direction: 'DESC'
         }]
       }),
-      columnCfgs: columns
-      //autoAddAllModelFieldsAsColumns: true
-      // columnCfgs: [{
-      //   text: 'ID',
-      //   dataIndex: 'FormattedID'
-      // },{
-      //   text: 'Name',
-      //   dataIndex: 'Name',
-      //   width: 200
-      // },{
-      //   text: 'Project',
-      //   dataIndex: 'Project'
-      // },{
-      //   text: 'Story Count',
-      //   dataIndex: 'LeafStoryCount1'
-      // },{
-      //   text: 'Story Plan Est Total',
-      //   dataIndex: 'LeafStoryPlanEstimateTotal1'
-      // },{
-      //   text: 'Story Count 2',
-      //   dataIndex: 'LeafStoryCount2'
-      // },{
-      //   text: 'Story Plan Est Total 2',
-      //   dataIndex: 'LeafStoryPlanEstimateTotal2'
-      // },{
-      //   text: 'Story count chg',
-      //   dataIndex: 'LeafStoryCountChg'
-      // },{
-      //   text: 'Story Plan Est Chg',
-      //   dataIndex: 'LeafStoryPlanEstimateTotalChg'
-      // },{
-      //   text: 'Story Count % Chg',
-      //   dataIndex: 'LeafStoryCountPercentChg',
-      // },{
-      //   text: 'Story Plan Est % Chg',
-      //   dataIndex: 'LeafStoryPlanEstimateTotalPercentChg'
-      // },{
-      //   text: 'Comment',
-      //   dataIndex: 'Comment'
-      // }]
+      columnCfgs: columns,
+      title: 'Release features Plan estimate total changes over time',
+      features: [{
+        ftype: 'summary'
+      }]
     });
     this.add(this._myGrid);
   }
