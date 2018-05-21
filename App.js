@@ -131,46 +131,70 @@ Ext.define('CustomApp', {
       removeUnauthorizedSnapshots: true
     });
   },
-  _buildDisplayGridRecords: function(snapshots) {
-    console.log(snapshots);
-    //snapshots is an array of arrays of snapshot results, one per snapshot date
-    //debugger;
+  _buildDisplayGridRecords: function(loadresults) {
+    console.log(loadresults);
+    //loadresults is the return of all the store load function calls
+    //it is an array, with each element an array of snapshot models from a store load() with a specific __At date filter
     var snapshotdates = this._getSnapshotdates(this.getContext().getTimeboxScope().getRecord());
-    
-    // var summarygridrecords = [{label:'added'},{label:'removed'},{label:'changed'},{label:'unchanged'}];
-    // snapshotdates.forEach(function(element){
-    //   summarygridrecord.added
-    // });
-
+    var sumrecs = this._createSumGricRecs(snapshotdates);
     var gridrecords = [];
-    for (var i = 0; i < snapshots.length; i++ ) {
-      //debugger;
-      //console.log(i);
-      //console.log(snapshots[i]);
-      for (var n = 0; n < snapshots[i].length; n++){
-        //find  by FeatureID
-        var snapshotrec = snapshots[i][n];
-        var foundrec = gridrecords.find(function (element) {
-          return (element.FormattedID === snapshotrec.get('FormattedID'));
+
+    //loop over each snapshot store load result
+    for (var i = 0; i < loadresults.length; i++ ) {
+      var count, added, removed, changed, unchanged = 0; //some counters to keep track of features added/removed/change at each snapshot date
+
+      //get the snapshot store filter __At date
+      var store = loadresults[i][0].store;
+      var atDate = store.getFilters().items[3].value; //snapshot store filter item 3 is '__At' date
+      count = loadresults[i].length; //set summary record count, equal to # of features in release at snapshot date
+
+      //loop over each snapshot model updating display grid records appropriately
+      for (var n = 0; n < loadresults[i].length; n++){
+        var snapshot = loadresults[i][n];
+        //var snapshotdate = snapshot.store.getFilters().items[3].value; //snapshot store filter item 3 is '__At' date
+        //see if feature exists already gridrecords by FeatureID
+        var gricrec = gridrecords.find(function (element) {
+          return (element.FormattedID === snapshot.get('FormattedID'));
         });
-        if (foundrec === undefined){
-          //add it
+        if (gricrec === undefined){
+          //add new record to gridrecords
           var newgridrec = {};
-          newgridrec.FormattedID = snapshotrec.get('FormattedID');
-          newgridrec.Name = snapshotrec.get('Name');
-          newgridrec.Project = snapshotrec.get('Project').Name;
+          newgridrec.FormattedID = snapshot.get('FormattedID');
+          newgridrec.Name = snapshot.get('Name');
+          newgridrec.Project = snapshot.get('Project').Name;
           for (var j = 0; j < snapshotdates.length; j++){
             newgridrec[snapshotdates[j]] = null;
           }
-          //snapshot store filter item 3 is '__At' date
-          newgridrec[snapshotrec.store.getFilters().items[3].value] = snapshotrec.get('LeafStoryPlanEstimateTotal');
-          newgridrec.firstVal =  snapshotrec.get('LeafStoryPlanEstimateTotal');
-          newgridrec.changeVal = 0;
+          newgridrec[atDate] = snapshot.get('LeafStoryPlanEstimateTotal');
+          newgridrec.firstVal =  snapshot.get('LeafStoryPlanEstimateTotal');
+          newgridrec.planEstDiff = 0;
           gridrecords.push(newgridrec);
+          if (i > 0) { //not the first set of snapshot records, i.e. after start of PI date
+            //increment the added counter
+            //sumrecs[0][atDate]++; //added counter
+            added++;
+          }//
         } else {
-          foundrec[snapshotrec.store.getFilters().items[3].value] = snapshotrec.get('LeafStoryPlanEstimateTotal');
-          foundrec.changeVal = snapshotrec.get('LeafStoryPlanEstimateTotal') - foundrec.firstVal;
+          //update existing gridrecord with snapshot data
+          gricrec[atDate] = snapshot.get('LeafStoryPlanEstimateTotal');
+          gricrec.planEstDiff = snapshot.get('LeafStoryPlanEstimateTotal') - gricrec.firstVal;
+          //sumrecs[2][atDate]++; //changed counter
+          if (planEstDiff !== 0) { //plan est total value changed
+            changed++;
+          }
+
         }
+        if (i>0) { //not the first snapshot date
+          //feature count at this snapshot date = prevcount + any added - any removed
+          var prevcount = loadresults[i-1].length; //current loadresults index - 1
+          var currcount = loadresults[i].length; //count of feature loadresults in current array
+          var added = sumrecs[0][atDate]++; //counter been updating for this snapshot date when adding new recs
+          var removed = currcount - prevcount - added;
+          if (removed > 0) {
+            //set the summary record field
+            sumrecs[1][atDate] = removed;
+          }
+        } 
       }
     }
 
@@ -185,7 +209,7 @@ Ext.define('CustomApp', {
         gridrec.Note = 'added';
       } else if (gridrec[snapshotdates[snapshotdates.length-1]] === null) {
         gridrec.Note = 'removed';
-      } else if (gridrec.changeVal !== 0) {
+      } else if (gridrec.planEstDiff !== 0) {
         gridrec.Note = 'changed';
       } else {
         gridrec.Note = 'unchanged';
@@ -223,7 +247,7 @@ Ext.define('CustomApp', {
     }
     columns.push({
       text: 'Plan Est Total Chg',
-      dataIndex: 'changeVal',
+      dataIndex: 'planEstDiff',
       summaryType: 'sum'
     });
     columns.push({
@@ -237,7 +261,7 @@ Ext.define('CustomApp', {
       store: Ext.create('Rally.data.custom.Store', {
         data: gridrecords,
         sorters: [{
-          property: 'changeVal',
+          property: 'planEstDiff',
           direction: 'DESC'
         }]
       }),
@@ -248,5 +272,18 @@ Ext.define('CustomApp', {
       }]
     });
     this.add(this._myGrid);
+  },
+  _createSumGricRecs: function(dates){
+    var sumrecs = [];
+    var counters = ['added','removed','changed','unchanged','count'];
+    for (var c -=0; c < counters.length; c++ ) {
+      var newrec = {};
+      newrec.label = counters[c];
+      for (var d = 0; d < dates.length; d++) {
+        newrec[date[d]] = 0;
+      }
+      counters.push(newrec);
+    }
+    return records;
   }
 });
