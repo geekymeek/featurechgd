@@ -117,6 +117,7 @@ Ext.define('CustomApp', {
       context: this.getContext().getDataContext(),
       fetch: ['FormattedID',
         'Name',
+        'c_ServiceNowID',
         'Release',
         'Project',
         'LeafStoryCount',
@@ -136,7 +137,7 @@ Ext.define('CustomApp', {
     //loadresults is the return of all the store load function calls
     //it is an array, with each element an array of snapshot models from a store load() with a specific __At date filter
     var snapshotdates = this._getSnapshotdates(this.getContext().getTimeboxScope().getRecord());
-    var sumrecs = this._createSumGricRecs(snapshotdates);
+    //var sumrecs = this._createSumGricRecs(snapshotdates);
     var gridrecords = [];
 
     //loop over each snapshot store load result
@@ -161,6 +162,7 @@ Ext.define('CustomApp', {
           var newgridrec = {};
           newgridrec.FormattedID = snapshot.get('FormattedID');
           newgridrec.Name = snapshot.get('Name');
+          newgridrec.Demand = snapshot.get('c_ServiceNowID');
           newgridrec.Project = snapshot.get('Project').Name;
           for (var j = 0; j < snapshotdates.length; j++){
             newgridrec[snapshotdates[j]] = null;
@@ -179,7 +181,7 @@ Ext.define('CustomApp', {
           gricrec[atDate] = snapshot.get('LeafStoryPlanEstimateTotal');
           gricrec.planEstDiff = snapshot.get('LeafStoryPlanEstimateTotal') - gricrec.firstVal;
           //sumrecs[2][atDate]++; //changed counter
-          if (planEstDiff !== 0) { //plan est total value changed
+          if (gricrec.planEstDiff !== 0) { //plan est total value changed
             changed++;
           }
 
@@ -188,12 +190,12 @@ Ext.define('CustomApp', {
           //feature count at this snapshot date = prevcount + any added - any removed
           var prevcount = loadresults[i-1].length; //current loadresults index - 1
           var currcount = loadresults[i].length; //count of feature loadresults in current array
-          var added = sumrecs[0][atDate]++; //counter been updating for this snapshot date when adding new recs
+          // var added = sumrecs[0][atDate]++; //counter been updating for this snapshot date when adding new recs
           var removed = currcount - prevcount - added;
-          if (removed > 0) {
-            //set the summary record field
-            sumrecs[1][atDate] = removed;
-          }
+          // if (removed > 0) {
+          //   //set the summary record field
+          //   sumrecs[1][atDate] = removed;
+          // }
         } 
       }
     }
@@ -232,6 +234,10 @@ Ext.define('CustomApp', {
         dataIndex: 'Name',
         width: 400
       },{
+        text: 'Demand',
+        dataIndex: 'Demand',
+        width: 150
+      },{
         text: 'Project',
         dataIndex: 'Project',
         width: 150
@@ -256,7 +262,8 @@ Ext.define('CustomApp', {
     });
 
     this._myGrid = Ext.create('Rally.ui.grid.Grid', {
-      xtype: 'rallygrid',
+      // xtype: 'rallygrid',
+      xtype: 'rallygridboard',
       showRowActionsColumn: false,
       store: Ext.create('Rally.data.custom.Store', {
         data: gridrecords,
@@ -276,11 +283,11 @@ Ext.define('CustomApp', {
   _createSumGricRecs: function(dates){
     var sumrecs = [];
     var counters = ['added','removed','changed','unchanged','count'];
-    for (var c -=0; c < counters.length; c++ ) {
+    for (var c =0; c < counters.length; c++ ) {
       var newrec = {};
       newrec.label = counters[c];
       for (var d = 0; d < dates.length; d++) {
-        newrec[date[d]] = 0;
+        newrec[dates[d]] = 0;
       }
       counters.push(newrec);
     }

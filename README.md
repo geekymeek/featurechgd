@@ -2,7 +2,8 @@ Random App Name64611
 =========================
 
 ## Overview
-
+using lookback api show changes to feature leaf story plan est total at each sprint start date for release
+calculates and displays total net change
 
 ## License
 

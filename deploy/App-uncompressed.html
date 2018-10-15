@@ -8,177 +8,299 @@
     <script type="text/javascript">
         Rally.onReady(function () {
                 Ext.define('CustomApp', {
-  extend: 'Rally.app.App',
+  //extend: 'Rally.app.App',
+  extend: 'Rally.app.TimeboxScopedApp',
+  scopeType: 'release',
+  comboboxConfig: {
+    fieldLabel: 'Select an release:</div>',
+    width: 400
+  },
   componentCls: 'app',
-  launch: function() {
-    debugger;
-
-    var app = this;
-    var snapshotfilters = [];
-    // var project = this.getContext().getProject();
-    // var poid = project.ObjectID;
-    // or poid = this.getContext().getProject().ObjectID in one call
-    // var datacontext = this.getContext().getDataContext();
-    // debugger;
-
-    // _TypeHierarchy scope to artifact type
-    snapshotfilters.push({
-        property: '_TypeHierarchy',
-        operator: '=',
-        value: 'PortfolioItem/Feature'
+  onScopeChange: function(timeboxscope) {
+    //debugger;
+    var release = timeboxscope.getRecord();
+    var timeboxstore = Ext.create('Rally.data.wsapi.Store', {
+     model: 'Release',
+     filters: [{
+       property: 'Name',
+       operator: '=',
+       value: release.get('Name')
+     }],
+     context: this.getContext().getDataContext(),
+     fetch: ['ObjectID'],
+     autoload: false,
     });
-
-    // FormattedID just get a single story, for debugging
-    // snapshotfilters.push({
-    //     property: 'FormattedID',
-    //     operator: '=',
-    //     value: 'US64950'
-    // });
-
-    // _PreviousValues include only snapshots where PlanEstimate changed & previous value > 0 (elminates original est value)
-    // snapshotfilters.push({
-    //     property: '_PreviousValues.PlanEstimate',
-    //     value: {$exists: true}
-    // });
-    // snapshotfilters.push({
-    //     property: '_PreviousValues.PlanEstimate',
-    //     operator: '>',
-    //     value: 0
-    // });
-    snapshotfilters.push({
-        property: '_PreviousValues.LeafStoryPlanEstimateTotal',
-        value: {$exists: true}
-    });
-    snapshotfilters.push({
-        property: '_PreviousValues.LeafStoryPlanEstimateTotal',
-        value: {$ne: null}
-    });
-
-    // _ValidFrom set to limit timeboxscope, >= sprint start and <= sprint end
-    snapshotfilters.push({
-      property: '_ValidFrom',
-      operator: '>=',
-      value: '2018-03-01TZ'
-    });
-    snapshotfilters.push({
-      property: '_ValidFrom',
-      operator: '<=',
-      value: '2018-03-14TZ'
-    });
-
-    // _ValidTo if specifed will not include current snapshot, see __At and 'current'
-    // current snapshot date is 9999-99-99TZ
-    // snapshotfilters.push({
-    //     property: '_ValidTo',
-    //     operator: '<=',
-    //     value: '2016-10-31TZ'
-    // });
-
-    // _ProjectHierarchy !! required to limit scope !!
-    snapshotfilters.push({
-        property: '_ProjectHierarchy',
-        operator: '=',
-        value: this.getContext().getProject().ObjectID
-    });
-
-    //create the store
-    var snapshotStore = Ext.create('Rally.data.lookback.SnapshotStore', {
-        compress: true,
-        context: this.getContext().getDataContext(),
-        fetch: ['FormattedID',
-          'Name',
-          'LeafStoryPlanEstimateTotal',
-          'LeafStoryCount',
-          '_PreviousValues.LeafStoryPlanEstimateTotal',
-          '_PreviousValues.LeafStoryCount'],
-        hydrate: ['_PreviousValues.LeafStoryPlanEstimateTotal',
-          '_PreviousValues.LeafStoryCount' ],
-        filters: snapshotfilters,
-        groupField: 'Name',
-        groupDir: 'ASC',
-        getGroupString: function(instance){
-          return instance.get('FormattedID') + ' ' + instance.get('Name');
-        },
-        removeUnauthorizedSnapshots: true
-    });
-
-    //load the store
-    snapshotStore.load({
-      callback: function(records, operation) {
-        debugger;
-        if (operation.wasSuccessful()) {
-          //process records
-          debugger;
-          console.log(records);
-          app.add({
-            xtype: 'rallygrid',
-            store: snapshotStore,
-            showRowActionsColumn: false,
-            //features: ['grouping', 'groupingsummary'],
-            features: [{
-              ftype: 'groupingsummary',
-              groupHeaderTpl: '{FormattedID} {name} ({rows.length})'
-            }],
-            columnCfgs: [
-              {
-                // xtype: 'templatecolumn',
-                text: 'ID',
-                dataIndex: 'FormattedID',
-                width: 100,
-                // tpl: Ext.create('Rally.ui.renderer.template.FormattedIDTemplate')
-                renderer: function(value) {
-                  //debugger;
-                  return value;
-                }
-              }, {
-                text: 'Name',
-                dataIndex: 'Name'
-              // }, {
-              //     text: 'Plan Estimate',
-              //     dataIndex: 'PlanEstimate'
-              // }, {
-              //     text: 'Previous PlanEstimate',
-              //     dataIndex: '_PreviousValues',
-              //     renderer: function(value){
-              //       return value.PlanEstimate;
-              // }
-            }, {
-              text: 'Date',
-              dataIndex: '_ValidFrom'
-            }, {
-                  text: 'Plan Est Total',
-                  dataIndex: 'LeafStoryPlanEstimateTotal',
-                  renderer: function(value) {
-                    //debugger;
-                    return value;
-                  }
-              }, {
-                text: 'Previous total',
-                dataIndex: '_PreviousValues.LeafStoryPlanEstimateTotal',
-                renderer: function(value) {
-                  debugger;
-                  return value;
-                }
-              }, {
-                    text: 'LeafStoryCount',
-                    dataIndex: 'LeafStoryCount',
-                    renderer: function(value) {
-                      //debugger;
-                      return value;
-                    }
-                }, {
-                  text: 'Previous count',
-                  dataIndex: '_PreviousValues.LeafStoryCount',
-                  renderer: function(value) {
-                    debugger;
-                    return value;
-                  }
-                }
-            ]
-          });
+    timeboxstore.load().then({
+      success: function(releases) {
+        //debugger;
+        var relScopeOIDs = this._getReleaseScopeOIDs(releases);
+        var snapshotdates = this._getSnapshotdates(this.getContext().getTimeboxScope().getRecord());
+        var loadfunctions = [];
+        for (var i = 0; i < snapshotdates.length; i++ ) {
+          var snapshotStore = this._createRelSnapshotStoreAtDate(
+            relScopeOIDs,
+            snapshotdates[i]
+          );
+          loadfunctions.push(snapshotStore.load());
         }
-      }
+
+        Deft.Promise.all(loadfunctions).then({
+          success: function(results){
+            //debugger;
+            //console.log(results);
+            var gridrecords = this._buildDisplayGridRecords(results);
+            //console.log(gridrecords);
+            this._displayxgrid(gridrecords);
+          },
+          failure: function(){
+            //do something
+          },
+          scope: this
+        });
+     },
+     failure: function() {
+       //do something
+     },
+     scope: this
     });
+  },
+  _getReleaseScopeOIDs: function (releases) {
+    var oids = [];
+    _.each(releases, function(release){
+      oids.push(release.get('ObjectID'));
+    });
+    return oids;
+  },
+  _getSnapshotdates: function(release) {
+    //debugger;
+    var atDates = [];
+    //use start of pi date for first snapshot
+    atDates.push(release.get('formattedStartDate'));
+    //loop adding two weeks to start date until > now or PI end date
+    var dstart = new Date(release.get('formattedStartDate'));
+    var dend = new Date(release.get('formattedEndDate'));
+    var dnow = new Date();
+    var dnext = Rally.util.DateTime.add(dstart, "day", 14);
+    while(
+      (Rally.util.DateTime.getDifference(dend, dnext,'day') > 0) &&
+      (Rally.util.DateTime.getDifference(dnow, dnext,'day') > 0)
+    ) {
+      atDates.push(Rally.util.DateTime.format(dnext, "Y-m-d"));
+      dnext = Rally.util.DateTime.add(dnext, "day", 14);
+    }
+
+    //last snapshot date either end of PI or current date
+    if (Rally.util.DateTime.getDifference(dnow, dend,'day') > 0) {
+      //now > rel end date, past the pi end Date
+      //use pi end date for snapshot
+      atDates.push(release.get('formattedEndDate'));
+    } else {
+      //PI end date in the future
+      //use current Date for snapshot
+      atDates.push('current');
+    }
+    return atDates;
+  },
+  _createRelSnapshotStoreAtDate:function(relScopeOIDs, atDate){
+    var snapshotfilters = [];
+    snapshotfilters.push({
+      property: '_ProjectHierarchy',
+      value: this.getContext().getProject().ObjectID
+    });
+    snapshotfilters.push({
+      property: '_TypeHierarchy',
+      value: 'PortfolioItem/Feature'
+    });
+    snapshotfilters.push({
+      property: 'Release',
+      operator: '$in',
+      value: relScopeOIDs
+    });
+    snapshotfilters.push({
+      id: '__At',
+      property: '__At',
+      value: atDate
+    });
+    return Ext.create('Rally.data.lookback.SnapshotStore', {
+      compress: true,
+      context: this.getContext().getDataContext(),
+      fetch: ['FormattedID',
+        'Name',
+        'c_ServiceNowID',
+        'Release',
+        'Project',
+        'LeafStoryCount',
+        'LeafStoryPlanEstimateTotal'
+      ],
+      hydrate: ['Project'],
+      sorters: [{
+        property: 'FormattedID',
+        direction: 'ASC'
+      }],
+      filters: snapshotfilters,
+      removeUnauthorizedSnapshots: true
+    });
+  },
+  _buildDisplayGridRecords: function(loadresults) {
+    console.log(loadresults);
+    //loadresults is the return of all the store load function calls
+    //it is an array, with each element an array of snapshot models from a store load() with a specific __At date filter
+    var snapshotdates = this._getSnapshotdates(this.getContext().getTimeboxScope().getRecord());
+    //var sumrecs = this._createSumGricRecs(snapshotdates);
+    var gridrecords = [];
+
+    //loop over each snapshot store load result
+    for (var i = 0; i < loadresults.length; i++ ) {
+      var count, added, removed, changed, unchanged = 0; //some counters to keep track of features added/removed/change at each snapshot date
+
+      //get the snapshot store filter __At date
+      var store = loadresults[i][0].store;
+      var atDate = store.getFilters().items[3].value; //snapshot store filter item 3 is '__At' date
+      count = loadresults[i].length; //set summary record count, equal to # of features in release at snapshot date
+
+      //loop over each snapshot model updating display grid records appropriately
+      for (var n = 0; n < loadresults[i].length; n++){
+        var snapshot = loadresults[i][n];
+        //var snapshotdate = snapshot.store.getFilters().items[3].value; //snapshot store filter item 3 is '__At' date
+        //see if feature exists already gridrecords by FeatureID
+        var gricrec = gridrecords.find(function (element) {
+          return (element.FormattedID === snapshot.get('FormattedID'));
+        });
+        if (gricrec === undefined){
+          //add new record to gridrecords
+          var newgridrec = {};
+          newgridrec.FormattedID = snapshot.get('FormattedID');
+          newgridrec.Name = snapshot.get('Name');
+          newgridrec.Demand = snapshot.get('c_ServiceNowID');
+          newgridrec.Project = snapshot.get('Project').Name;
+          for (var j = 0; j < snapshotdates.length; j++){
+            newgridrec[snapshotdates[j]] = null;
+          }
+          newgridrec[atDate] = snapshot.get('LeafStoryPlanEstimateTotal');
+          newgridrec.firstVal =  snapshot.get('LeafStoryPlanEstimateTotal');
+          newgridrec.planEstDiff = 0;
+          gridrecords.push(newgridrec);
+          if (i > 0) { //not the first set of snapshot records, i.e. after start of PI date
+            //increment the added counter
+            //sumrecs[0][atDate]++; //added counter
+            added++;
+          }//
+        } else {
+          //update existing gridrecord with snapshot data
+          gricrec[atDate] = snapshot.get('LeafStoryPlanEstimateTotal');
+          gricrec.planEstDiff = snapshot.get('LeafStoryPlanEstimateTotal') - gricrec.firstVal;
+          //sumrecs[2][atDate]++; //changed counter
+          if (gricrec.planEstDiff !== 0) { //plan est total value changed
+            changed++;
+          }
+
+        }
+        if (i>0) { //not the first snapshot date
+          //feature count at this snapshot date = prevcount + any added - any removed
+          var prevcount = loadresults[i-1].length; //current loadresults index - 1
+          var currcount = loadresults[i].length; //count of feature loadresults in current array
+          // var added = sumrecs[0][atDate]++; //counter been updating for this snapshot date when adding new recs
+          var removed = currcount - prevcount - added;
+          // if (removed > 0) {
+          //   //set the summary record field
+          //   sumrecs[1][atDate] = removed;
+          // }
+        } 
+      }
+    }
+
+    // set the display grid comment
+    //added: added to release after start of PI
+    //removed: removed from release after start of PI
+    //changed: in PI at start and end, but plan est total changed
+    //unchanged: in PI at start and end, plan est total unchanged
+    for (i = 0; i < gridrecords.length; i++ ) {
+      var gridrec = gridrecords[i];
+      if (gridrec[snapshotdates[0]] === null) {
+        gridrec.Note = 'added';
+      } else if (gridrec[snapshotdates[snapshotdates.length-1]] === null) {
+        gridrec.Note = 'removed';
+      } else if (gridrec.planEstDiff !== 0) {
+        gridrec.Note = 'changed';
+      } else {
+        gridrec.Note = 'unchanged';
+      }
+    }
+
+    console.log(gridrecords);
+    return gridrecords;
+  },
+  _displayxgrid: function(gridrecords) {
+    debugger;
+    if (this._myGrid) {
+        this._myGrid.destroy();
+    }
+    var columns = [{
+      text: 'ID',
+      dataIndex: 'FormattedID'
+      },{
+        text: 'Name',
+        dataIndex: 'Name',
+        width: 400
+      },{
+        text: 'Demand',
+        dataIndex: 'Demand',
+        width: 150
+      },{
+        text: 'Project',
+        dataIndex: 'Project',
+        width: 150
+      }
+    ];
+    var snapshotdates = this._getSnapshotdates(this.getContext().getTimeboxScope().getRecord());
+    for (var i = 0; i < snapshotdates.length; i++){
+      columns.push({
+        text: snapshotdates[i],
+        dataIndex: snapshotdates[i],
+        summaryType: 'sum'
+      });
+    }
+    columns.push({
+      text: 'Plan Est Total Chg',
+      dataIndex: 'planEstDiff',
+      summaryType: 'sum'
+    });
+    columns.push({
+      text: 'Note',
+      dataIndex: 'Note'
+    });
+
+    this._myGrid = Ext.create('Rally.ui.grid.Grid', {
+      // xtype: 'rallygrid',
+      xtype: 'rallygridboard',
+      showRowActionsColumn: false,
+      store: Ext.create('Rally.data.custom.Store', {
+        data: gridrecords,
+        sorters: [{
+          property: 'planEstDiff',
+          direction: 'DESC'
+        }]
+      }),
+      columnCfgs: columns,
+      title: 'Release features Plan estimate total changes over time',
+      features: [{
+        ftype: 'summary'
+      }]
+    });
+    this.add(this._myGrid);
+  },
+  _createSumGricRecs: function(dates){
+    var sumrecs = [];
+    var counters = ['added','removed','changed','unchanged','count'];
+    for (var c =0; c < counters.length; c++ ) {
+      var newrec = {};
+      newrec.label = counters[c];
+      for (var d = 0; d < dates.length; d++) {
+        newrec[dates[d]] = 0;
+      }
+      counters.push(newrec);
+    }
+    return records;
   }
 });
 
