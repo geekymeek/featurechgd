@@ -121,7 +121,9 @@ Ext.define('CustomApp', {
         'Release',
         'Project',
         'LeafStoryCount',
-        'LeafStoryPlanEstimateTotal'
+        'LeafStoryPlanEstimateTotal',
+        'PlannedStartDate',
+        'PlannedEndDate'
       ],
       hydrate: ['Project'],
       sorters: [{
@@ -134,6 +136,7 @@ Ext.define('CustomApp', {
   },
   _buildDisplayGridRecords: function(loadresults) {
     console.log(loadresults);
+    debugger;
     //loadresults is the return of all the store load function calls
     //it is an array, with each element an array of snapshot models from a store load() with a specific __At date filter
     var snapshotdates = this._getSnapshotdates(this.getContext().getTimeboxScope().getRecord());
@@ -164,6 +167,7 @@ Ext.define('CustomApp', {
           newgridrec.Name = snapshot.get('Name');
           newgridrec.Demand = snapshot.get('c_ServiceNowID');
           newgridrec.Project = snapshot.get('Project').Name;
+          newgridrec.planStart0 = null;
           
           //newgridrec.LeafStoryCounts = {};
           //newgridrec.LeafStoryPlanEstimateTotals = {};
@@ -173,6 +177,9 @@ Ext.define('CustomApp', {
             newgridrec[snapshotdates[j]] = {};
             newgridrec[snapshotdates[j]].LeafStoryPlanEstimateTotal = null;
             newgridrec[snapshotdates[j]].LeafStoryCount = null;
+            newgridrec[snapshotdates[j]].PlannedStartDate = null;
+            newgridrec[snapshotdates[j]].PlannedEndDate = null;
+
   
             //newgridrec.LeafStoryCounts[snapshotdates[j]] = null;
             //newgridrec.LeafStoryPlanEstimateTotals[snapshotdates[j]] = null;
@@ -181,6 +188,18 @@ Ext.define('CustomApp', {
           //newgridrec[atDate] = snapshot.get('LeafStoryPlanEstimateTotal');
           newgridrec[atDate].LeafStoryPlanEstimateTotal = snapshot.get('LeafStoryPlanEstimateTotal');
           newgridrec[atDate].LeafStoryCount = snapshot.get('LeafStoryCount');
+          
+          //planned start and end dates could be null or empty string, if usable will be a ISO date formt e.g. '2006-10-29T06:00:00Z'
+          if (snapshot.get('PlannedStartDate').length == 24) {
+            newgridrec[atDate].PlannedStartDate = Rally.util.DateTime.fromIsoString(snapshot.get('PlannedStartDate'));
+            newgridrec.planStart0 = newgridrec[atDate].PlannedStartDate;
+          }
+          if (snapshot.get('PlannedEndDate').length == 24) {
+            newgridrec[atDate].PlannedEndDate = Rally.util.DateTime.fromIsoString(snapshot.get('PlannedEndDate'));
+            newgridrec.planEnd0 = newgridrec[atDate].PlannedEndDate;
+          }
+          newgridrec.planStartChg = 0;
+          newgridrec.planEndChg = 0;
 
           //newgridrec.LeafStoryCounts[atDate] = snapshot.get('LeafStoryCount');
           //newgridrec.LeafStoryPlanEstimateTotals[atDate] = snapshot.get('LeafStoryPlanEstimateTotal');
@@ -202,6 +221,29 @@ Ext.define('CustomApp', {
           //gridrec[atDate] = snapshot.get('LeafStoryPlanEstimateTotal');
           gridrec[atDate].LeafStoryPlanEstimateTotal = snapshot.get('LeafStoryPlanEstimateTotal');
           gridrec[atDate].LeafStoryCount = snapshot.get('LeafStoryCount');
+          if (snapshot.get('PlannedStartDate').length == 24) {
+            gridrec[atDate].PlannedStartDate = Rally.util.DateTime.fromIsoString(snapshot.get('PlannedStartDate'));
+            if (gridrec.planStart0 === null) {
+              gridrec.planStart0 = gridrec[atDate].PlannedStartDate;
+            }  
+          }
+          if (snapshot.get('PlannedEndDate').length == 24) {
+            gridrec[atDate].PlannedEndDate = Rally.util.DateTime.fromIsoString(snapshot.get('PlannedEndDate'));
+            if (gridrec.planEnd0 === null) {
+              gridrec.planEnd0 = gridrec[atDate].PlannedEndDate;
+            }
+          }
+          
+          try {
+            if (gridrec[atDate].PlannedStartDate !== null && gridrec.planStart0 !== null) {
+              gridrec.planStartChg = Rally.util.DateTime.getDifference(gridrec[atDate].PlannedStartDate, gridrec.planStart0, 'day');
+            }
+            if (gridrec[atDate].PlannedEndDate !== null && gridrec.planEnd0 !== null) {
+              gridrec.planEndChg = Rally.util.DateTime.getDifference(gridrec[atDate].PlannedEndDate, gridrec.planEnd0, 'day');
+            }
+          } catch (err) {
+            console.log(gridrec)
+          }
 
           //gridrec.LeafStoryCounts[atDate] = snapshot.get('LeafStoryCount');
           //gridrec.LeafStoryPlanEstimateTotals[atDate] = snapshot.get('LeafStoryPlanEstimateTotal');
@@ -236,17 +278,34 @@ Ext.define('CustomApp', {
     //unchanged: in PI at start and end, plan est total unchanged
     for (i = 0; i < gridrecords.length; i++ ) {
       var gridrec = gridrecords[i];
-      // if (gridrec[snapshotdates[0]] === null) {
+     
       if (gridrec[snapshotdates[0]].LeafStoryPlanEstimateTotal === null) {
-        gridrec.Note = 'added';
-      //} else if (gridrec[snapshotdates[snapshotdates.length-1]] === null) {
+        gridrec.Note = 'added after start of PI';
       } else if (gridrec[snapshotdates[snapshotdates.length-1]].LeafStoryPlanEstimateTotal === null) {
         gridrec.Note = 'removed';
-      } else if (gridrec.planEstDiff !== 0) {
-        gridrec.Note = 'changed';
+      } else if (gridrec.planEstDiff !==0) {
+        gridrec.Note = 'plan est changed';
       } else {
-        gridrec.Note = 'unchanged';
+        gridrec.Note = '';
       }
+
+      if (gridrec.countDiff !== 0) {
+        gridrec.Note = gridrec.Note.concat('<br>story count changed');
+      }
+
+      if (gridrec.planStartChg > 0) {
+        gridrec.Note = gridrec.Note.concat(("<br>start later " + gridrec.planStartChg + ' days').fontcolor("orange"));
+      } else if (gridrec.planStartChg < 0) {
+        gridrec.Note = gridrec.Note.concat(('<br>start sooner ' + gridrec.planStartChg + ' days').fontcolor('green'));       
+      }
+
+      if (gridrec.planEndChg > 0) {
+        gridrec.Note = gridrec.Note.concat(('<br>end later ' + gridrec.planEndChg + ' days').fontcolor('red'));
+      } else if (gridrec.planEndChg < 0) {
+        gridrec.Note = gridrec.Note.concat(('<br>start sooner ' + gridrec.planEndChg + ' days').fontcolor('green'));       
+      }
+
+      debugger;
     }
 
     console.log(gridrecords);
@@ -254,12 +313,14 @@ Ext.define('CustomApp', {
   },
   _displayxgrid: function(gridrecords) {
     debugger;
-    if (this._myGrid) {
-        this._myGrid.destroy();
+    if (this._featureGrid) {
+        this._featureGrid.destroy();
     }
-    var columns = [{
-      text: 'ID',
-      dataIndex: 'FormattedID'
+    var columns = [
+      {
+        text: 'ID',
+        dataIndex: 'FormattedID',
+        tpl: Ext.create('Rally.ui.renderer.template.FormattedIDTemplate')
       },{
         text: 'Name',
         dataIndex: 'Name',
@@ -281,8 +342,11 @@ Ext.define('CustomApp', {
         dataIndex: snapshotdates[i],
         //summaryType: 'sum',
         renderer: function(value) {
-          return value.LeafStoryCount + ' / ' + value.LeafStoryPlanEstimateTotal;
-        }
+          return value.LeafStoryCount + ', ' + value.LeafStoryPlanEstimateTotal + ', ' + 
+           Ext.Date.format(value.PlannedStartDate,"m/d") + '-' + 
+           Ext.Date.format(value.PlannedEndDate,"m/d");
+        },
+        width: 150
       });
     }
 
@@ -300,10 +364,11 @@ Ext.define('CustomApp', {
 
     columns.push({
       text: 'Note',
-      dataIndex: 'Note'
+      dataIndex: 'Note',
+      width: 200
     });
 
-    this._myGrid = Ext.create('Rally.ui.grid.Grid', {
+    this._featureGrid = Ext.create('Rally.ui.grid.Grid', {
       // xtype: 'rallygrid',
       xtype: 'rallygridboard',
       showRowActionsColumn: false,
@@ -320,7 +385,7 @@ Ext.define('CustomApp', {
         ftype: 'summary'
       }]
     });
-    this.add(this._myGrid);
+    this.add(this._featureGrid);
   },
   _createSumgridrecs: function(dates){
     var sumrecs = [];
